@@ -87,6 +87,38 @@ const API_URL = "https://solopooldash.jesf777.workers.dev/ckpool/" + BTC_ADDRESS
       return div;
     }
 
+        function formatShare(value) {
+      if (value == null) return "N/A";
+      const v = Number(value);
+      if (!Number.isFinite(v)) return "N/A";
+
+      const abs = Math.abs(v);
+      let unit = "";
+      let divisor = 1;
+
+      if (abs >= 1e12) {
+        unit = "T";
+        divisor = 1e12;
+      } else if (abs >= 1e9) {
+        unit = "G";
+        divisor = 1e9;
+      } else if (abs >= 1e6) {
+        unit = "M";
+        divisor = 1e6;
+      } else if (abs >= 1e3) {
+        unit = "K";
+        divisor = 1e3;
+      }
+
+      const short = (v / divisor)
+        .toFixed(divisor === 1 ? 0 : 3) // 3 decimals for nicer G values
+        .replace(/\.0+$/, "")           // strip .0 / .00
+        .replace(/(\.\d*[1-9])0+$/, "$1");
+
+      return short + unit;
+    }
+
+
     async function loadStats() {
       const statusEl = document.getElementById("status");
       const mainStatsEl = document.getElementById("main-stats");
@@ -111,18 +143,19 @@ const API_URL = "https://solopooldash.jesf777.workers.dev/ckpool/" + BTC_ADDRESS
         mainStatsEl.appendChild(
           createCard(
             "Best Share (Current Session)",
-            data.bestshare.toLocaleString(),
-            "Higher = closer to winning block"
+            formatShare(data.bestshare),
+            `Raw: ${data.bestshare.toLocaleString()}`
           )
         );
 
         mainStatsEl.appendChild(
           createCard(
             "Best Share (All Time)",
-            data.bestever.toLocaleString(),
-            ""
+            formatShare(data.bestever),
+            `Raw: ${data.bestever.toLocaleString()}`
           )
         );
+
 
         mainStatsEl.appendChild(
           createCard(
