@@ -29,43 +29,44 @@
       return `${days}d ago`;
     }
 
-    // Turn big share numbers into mining-style units: K, M, G, T, P, E
-    function formatShare(value) {
-      if (value == null) return "N/A";
-      const v = Number(value);
-      if (!Number.isFinite(v)) return "N/A";
+ // Turn big numbers into mining-style units: K, M, G, T, P, E
+function formatMiningNumber(value) {
+  if (value == null) return "N/A";
+  const v = Number(value);
+  if (!Number.isFinite(v)) return "N/A";
 
-      const abs = Math.abs(v);
-      let unit = "";
-      let divisor = 1;
+  const abs = Math.abs(v);
+  let unit = "";
+  let divisor = 1;
 
-      if (abs >= 1e18) {
-        unit = "E";
-        divisor = 1e18;
-      } else if (abs >= 1e15) {
-        unit = "P";
-        divisor = 1e15;
-      } else if (abs >= 1e12) {
-        unit = "T";
-        divisor = 1e12;
-      } else if (abs >= 1e9) {
-        unit = "G";
-        divisor = 1e9;
-      } else if (abs >= 1e6) {
-        unit = "M";
-        divisor = 1e6;
-      } else if (abs >= 1e3) {
-        unit = "K";
-        divisor = 1e3;
-      }
+  if (abs >= 1e18) {
+    unit = "E";
+    divisor = 1e18;
+  } else if (abs >= 1e15) {
+    unit = "P";
+    divisor = 1e15;
+  } else if (abs >= 1e12) {
+    unit = "T";
+    divisor = 1e12;
+  } else if (abs >= 1e9) {
+    unit = "G";
+    divisor = 1e9;
+  } else if (abs >= 1e6) {
+    unit = "M";
+    divisor = 1e6;
+  } else if (abs >= 1e3) {
+    unit = "K";
+    divisor = 1e3;
+  }
 
-      const short = (v / divisor)
-        .toFixed(divisor === 1 ? 0 : 3)
-        .replace(/\.0+$/, "")
-        .replace(/(\.\d*[1-9])0+$/, "$1");
+  const short = (v / divisor)
+    .toFixed(divisor === 1 ? 0 : 3)
+    .replace(/\.0+$/, "")
+    .replace(/(\.\d*[1-9])0+$/, "$1");
 
-      return short + unit;
-    }
+  return short + unit;
+}
+
 
     // Generic card builder with optional green progress bar
     function createCard(title, value, subtitle = "", progress = null) {
@@ -141,28 +142,27 @@
         const bestShareSession = Number(data.bestshare) || 0;
         const bestShareAllTime = Number(data.bestever) || 0;
 
-        // === DIFFICULTY ROW ===
-        if (btcDifficulty) {
-          difficultyEl.appendChild(
-            createCard(
-              "BTC Difficulty",
-              btcDifficulty.toLocaleString(undefined, {
-                maximumFractionDigits: 0,
-              })
-            )
-          );
-        }
+// === DIFFICULTY ROW ===
+if (btcDifficulty) {
+  difficultyEl.appendChild(
+    createCard(
+      "BTC Difficulty",
+      formatMiningNumber(btcDifficulty),
+      `Raw: ${btcDifficulty.toLocaleString()}`
+    )
+  );
+}
 
-        if (bchDifficulty) {
-          difficultyEl.appendChild(
-            createCard(
-              "BCH Difficulty",
-              bchDifficulty.toLocaleString(undefined, {
-                maximumFractionDigits: 0,
-              })
-            )
-          );
-        }
+if (bchDifficulty) {
+  difficultyEl.appendChild(
+    createCard(
+      "BCH Difficulty",
+      formatMiningNumber(bchDifficulty),
+      `Raw: ${bchDifficulty.toLocaleString()}`
+    )
+  );
+}
+
 
         // === SHARES ROW ===
 
