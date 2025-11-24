@@ -45,8 +45,9 @@
 
   <script>
     // === CONFIG ===
-    const BTC_ADDRESS = "bc1qa38m29hprs809kxnddsd03jwlq7p6sru7saw06"; // <- change if needed
-    const API_URL = `https://solo.ckpool.org/users/${BTC_ADDRESS}`;
+const BTC_ADDRESS = "bc1qa38m29hprs809kxnddsd03jwlq7p6sru7saw06";
+const API_URL = "https://solopooldash.jesf777.workers.dev/ckpool/" + BTC_ADDRESS;
+
     const REFRESH_INTERVAL_MS = 30000;
 
     document.getElementById("address").textContent = BTC_ADDRESS;
