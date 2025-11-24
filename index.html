@@ -31,12 +31,6 @@
       <h2 class="text-xl font-semibold mb-3">Hashrate</h2>
       <div id="hashrate-cards" class="grid gap-4 md:grid-cols-5"></div>
     </div>
-        <!-- Odds -->
-    <div class="mb-6">
-      <h2 class="text-xl font-semibold mb-3">Odds to Find a BTC Block</h2>
-      <div id="odds-cards" class="grid gap-4 md:grid-cols-4"></div>
-    </div>
-
 
     <!-- Worker stats -->
     <div class="mb-6">
@@ -49,7 +43,7 @@
     </footer>
   </div>
 
-    <script>
+     <script>
     // === CONFIG ===
     const BTC_ADDRESS = "bc1qa38m29hprs809kxnddsd03jwlq7p6sru7saw06";
     const API_URL =
@@ -81,10 +75,61 @@
       return `${days}d ago`;
     }
 
-    function createCard(title, value, subtitle = "") {
+    // Optional helper if you later want to show compact units like 2.99G, etc.
+    function formatShare(value) {
+      if (value == null) return "N/A";
+      const v = Number(value);
+      if (!Number.isFinite(v)) return "N/A";
+
+      const abs = Math.abs(v);
+      let unit = "";
+      let divisor = 1;
+
+      if (abs >= 1e12) {
+        unit = "T";
+        divisor = 1e12;
+      } else if (abs >= 1e9) {
+        unit = "G";
+        divisor = 1e9;
+      } else if (abs >= 1e6) {
+        unit = "M";
+        divisor = 1e6;
+      } else if (abs >= 1e3) {
+        unit = "K";
+        divisor = 1e3;
+      }
+
+      const short = (v / divisor)
+        .toFixed(divisor === 1 ? 0 : 3)
+        .replace(/\.0+$/, "")
+        .replace(/(\.\d*[1-9])0+$/, "$1");
+
+      return short + unit;
+    }
+
+    // Card builder with optional progress bar
+    function createCard(title, value, subtitle = "", progress = null) {
       const div = document.createElement("div");
       div.className =
         "bg-slate-800/70 border border-slate-700 rounded-xl p-4 flex flex-col gap-1";
+
+      let progressHtml = "";
+      if (progress && typeof progress.fraction === "number") {
+        const pct = Math.max(0, Math.min(1, progress.fraction)) * 100;
+        const colorClass = progress.colorClass || "bg-emerald-500";
+        const labelHtml = progress.label
+          ? `<p class="text-[11px] text-slate-400 mb-1">${progress.label}</p>`
+          : "";
+        progressHtml = `
+          <div class="mt-3">
+            ${labelHtml}
+            <div class="w-full h-2 bg-slate-700 rounded-full overflow-hidden">
+              <div class="${colorClass} h-full" style="width:${pct}%;"></div>
+            </div>
+          </div>
+        `;
+      }
+
       div.innerHTML = `
         <p class="text-xs uppercase tracking-wide text-slate-400">${title}</p>
         <p class="text-xl font-semibold">${value}</p>
@@ -93,75 +138,9 @@
             ? `<p class="text-xs text-slate-400">${subtitle}</p>`
             : ""
         }
+        ${progressHtml}
       `;
       return div;
-    }
-
-    // Parse hashrate like "44.6T", "11.7P", etc → hashes/second
-    function parseHashrate(hrString) {
-      if (!hrString) return null;
-      const match = /([\d.]+)\s*([kMGTPE])?/i.exec(hrString);
-      if (!match) return null;
-      const num = parseFloat(match[1]);
-      if (!Number.isFinite(num)) return null;
-      const unit = (match[2] || "").toUpperCase();
-      const multipliers = {
-        "": 1,
-        K: 1e3,
-        M: 1e6,
-        G: 1e9,
-        T: 1e12,
-        P: 1e15,
-        E: 1e18,
-      };
-      return num * (multipliers[unit] || 1);
-    }
-
-    function calcOdds(hashrateHs, difficulty) {
-      if (!hashrateHs || !difficulty) return null;
-
-      const hashesPerBlock = difficulty * Math.pow(2, 32); // BTC PoW relation
-      const lambdaPerSecond = hashrateHs / hashesPerBlock; // expected blocks / sec
-
-      const SECS_DAY = 86400;
-      const SECS_WEEK = 7 * SECS_DAY;
-      const SECS_MONTH = 30 * SECS_DAY;
-      const SECS_YEAR = 365 * SECS_DAY;
-
-      function probOver(seconds) {
-        const lambda = lambdaPerSecond * seconds;
-        return 1 - Math.exp(-lambda);
-      }
-
-      return {
-        day: probOver(SECS_DAY),
-        week: probOver(SECS_WEEK),
-        month: probOver(SECS_MONTH),
-        year: probOver(SECS_YEAR),
-        expectedSeconds: 1 / lambdaPerSecond,
-      };
-    }
-
-    function formatProbability(p) {
-      if (!p || p <= 0) return "0%";
-      const pct = p * 100;
-      let pctStr;
-      if (pct >= 0.1) pctStr = pct.toFixed(2) + "%";
-      else pctStr = pct.toFixed(4) + "%";
-
-      const oneIn = Math.round(1 / p);
-      return `${pctStr} (~1 in ${oneIn.toLocaleString()})`;
-    }
-
-    function formatDuration(seconds) {
-      if (!seconds || !Number.isFinite(seconds)) return "N/A";
-      const days = seconds / 86400;
-      if (days < 1) return `${seconds.toFixed(1)} s`;
-      if (days < 7) return `${days.toFixed(1)} days`;
-      const weeks = days / 7;
-      if (weeks < 52) return `${weeks.toFixed(1)} weeks`;
-      const years = days / 365;
-      return `${years.toFixed(2)} years`;
     }
 
     async function loadStats() {
@@ -169,7 +148,6 @@
       const mainStatsEl = document.getElementById("main-stats");
       const hashrateEl = document.getElementById("hashrate-cards");
       const workersEl = document.getElementById("workers");
-      const oddsEl = document.getElementById("odds-cards");
 
       statusEl.textContent = "Loading latest stats…";
 
@@ -183,12 +161,10 @@
         if (!statsRes.ok) throw new Error(`CKPool HTTP ${statsRes.status}`);
 
         const data = await statsRes.json();
-        const btcDiffData = btcDiffRes && btcDiffRes.ok
-          ? await btcDiffRes.json()
-          : null;
-        const bchDiffData = bchDiffRes && bchDiffRes.ok
-          ? await bchDiffRes.json()
-          : null;
+        const btcDiffData =
+          btcDiffRes && btcDiffRes.ok ? await btcDiffRes.json() : null;
+        const bchDiffData =
+          bchDiffRes && bchDiffRes.ok ? await bchDiffRes.json() : null;
 
         const btcDifficulty = btcDiffData?.difficulty || null;
         const bchDifficulty = bchDiffData?.difficulty || null;
@@ -199,34 +175,12 @@
         mainStatsEl.innerHTML = "";
         hashrateEl.innerHTML = "";
         workersEl.innerHTML = "";
-        oddsEl.innerHTML = "";
 
-        // === MAIN STATS ===
-        mainStatsEl.appendChild(
-          createCard(
-            "Best Share (Current Session)",
-            data.bestshare.toLocaleString(),
-            "Higher = closer to winning block"
-          )
-        );
+        // Numeric best shares
+        const bestShareSession = Number(data.bestshare) || 0;
+        const bestShareAllTime = Number(data.bestever) || 0;
 
-        mainStatsEl.appendChild(
-          createCard(
-            "Best Share (All Time)",
-            data.bestever.toLocaleString(),
-            ""
-          )
-        );
-
-        mainStatsEl.appendChild(
-          createCard(
-            "Total Shares",
-            data.shares.toLocaleString(),
-            `Workers: ${data.workers}`
-          )
-        );
-
-        // Network difficulty cards (BTC & BCH)
+        // === DIFFICULTY CARDS (at the top) ===
         if (btcDifficulty) {
           mainStatsEl.appendChild(
             createCard(
@@ -251,11 +205,64 @@
           );
         }
 
-        // === HASHRATE CARDS ===
+        // === BEST SHARE CARDS, WITH PROGRESS BARS ===
+
+        // Progress 1: current session vs all-time best
+        let sessionFraction = 0;
+        if (bestShareAllTime > 0) {
+          sessionFraction = bestShareSession / bestShareAllTime;
+        }
+
+        mainStatsEl.appendChild(
+          createCard(
+            "Best Share (Current Session)",
+            bestShareSession.toLocaleString(),
+            "Higher = closer to winning block",
+            {
+              fraction: sessionFraction,
+              label: bestShareAllTime
+                ? `${(sessionFraction * 100).toFixed(2)}% of your all-time best`
+                : "",
+              colorClass: "bg-sky-500",
+            }
+          )
+        );
+
+        // Progress 2: all-time best vs BTC difficulty
+        let diffFraction = 0;
+        let diffLabel = "";
+        if (btcDifficulty && bestShareAllTime > 0) {
+          diffFraction = bestShareAllTime / btcDifficulty;
+          diffLabel = `${(diffFraction * 100).toPrecision(3)}% of BTC difficulty`;
+        }
+
+        mainStatsEl.appendChild(
+          createCard(
+            "Best Share (All Time)",
+            bestShareAllTime.toLocaleString(),
+            "",
+            btcDifficulty
+              ? {
+                  fraction: diffFraction,
+                  label: diffLabel,
+                  colorClass: "bg-emerald-500",
+                }
+              : null
+          )
+        );
+
+        // === TOTAL SHARES CARD ===
+        mainStatsEl.appendChild(
+          createCard(
+            "Total Shares",
+            data.shares.toLocaleString(),
+            `Workers: ${data.workers}`
+          )
+        );
+
+        // === HASHRATE CARDS (1m, 1d, 7d only) ===
         const hrLabels = {
           hashrate1m: "1 min",
-          hashrate5m: "5 min",
-          hashrate1hr: "1 hour",
           hashrate1d: "1 day",
           hashrate7d: "7 days",
         };
@@ -285,16 +292,12 @@
                   <p class="font-semibold">${w.hashrate1m}</p>
                 </div>
                 <div>
-                  <p class="text-xs text-slate-400">5m</p>
-                  <p class="font-semibold">${w.hashrate5m}</p>
-                </div>
-                <div>
-                  <p class="text-xs text-slate-400">1h</p>
-                  <p class="font-semibold">${w.hashrate1hr}</p>
-                </div>
-                <div>
                   <p class="text-xs text-slate-400">1d</p>
                   <p class="font-semibold">${w.hashrate1d}</p>
+                </div>
+                <div>
+                  <p class="text-xs text-slate-400">7d</p>
+                  <p class="font-semibold">${data.hashrate7d || "—"}</p>
                 </div>
               </div>
 
@@ -314,37 +317,6 @@
             workersEl.appendChild(card);
           });
         }
-
-        // === ODDS SECTION === (BTC only, using 1-day hashrate)
-        if (btcDifficulty && data.hashrate1d) {
-          const hrHs = parseHashrate(data.hashrate1d);
-          const odds = calcOdds(hrHs, btcDifficulty);
-
-          if (odds) {
-            oddsEl.appendChild(
-              createCard(
-                "Chance in 1 day",
-                formatProbability(odds.day),
-                `Using 1-day hashrate: ${data.hashrate1d}`
-              )
-            );
-            oddsEl.appendChild(
-              createCard("Chance in 1 week", formatProbability(odds.week))
-            );
-            oddsEl.appendChild(
-              createCard("Chance in 1 month", formatProbability(odds.month))
-            );
-            oddsEl.appendChild(
-              createCard(
-                "Chance in 1 year",
-                formatProbability(odds.year),
-                `Expected time to hit a block: ${formatDuration(
-                  odds.expectedSeconds
-                )}`
-              )
-            );
-          }
-        }
       } catch (err) {
         console.error(err);
         statusEl.textContent =
@@ -355,6 +327,7 @@
     loadStats();
     setInterval(loadStats, REFRESH_INTERVAL_MS);
   </script>
+
 
 </body>
 </html>
